@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Undies Invaders</title>
+  <style>
+    canvas {
+      background: black;
+      display: block;
+      margin: 0 auto;
+    }
+    body {
+      text-align: center;
+      color: white;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="color: lime;">🩲 Undies Invaders</h1>
+  <canvas id="gameCanvas" width="500" height="600"></canvas>
+  <button id="restartBtn" style="display:none; margin-top: 10px; font-size: 16px; padding: 6px 12px;">Restart</button>
+  <audio id="shootSound" src="https://www.soundjay.com/button/sounds/button-16.mp3" preload="auto"></audio>
+  <audio id="hitSound" src="https://www.soundjay.com/button/sounds/button-3.mp3" preload="auto"></audio>
+  <audio id="splatSound" src="https://www.soundjay.com/button/sounds/button-10.mp3" preload="auto"></audio>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const player = {
+      x: canvas.width / 2 - 20,
+      y: canvas.height - 40,
+      width: 40,
+      height: 20,
+      speed: 5,
+      bullets: []
+    };
+
+    const underwears = [];
+    let poopBombs = [];
+    const bulletSpeed = 9;
+    let tick = 0;
+let underwearDirection = 1;
+    let score = 0;
+      let underwearSpeed = 2.5;
+    let gameOver = false;
+let lastShotTime = 0;
+const shotCooldown = 300;
+
+    let keys = {};
+
+    function getRandomColor() {
+      const colors = ['red', 'blue', 'green', 'orange', 'purple', 'yellow'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function getRandomEmoji() {
+      const emojis = ['🩲', '🩳', '👙', '👘'];
+      return emojis[Math.floor(Math.random() * emojis.length)];
+    }
+
+    function createUnderwears() {
+      for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+          underwears.push({
+            baseX: j * 80 + 30,
+            baseY: i * 40 + 20,
+            width: 40,
+            height: 30,
+            color: getRandomColor(),
+            emoji: getRandomEmoji(),
+            alive: true
+          });
+        }
+      }
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = 'white';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+
+    function drawUnderwears() {
+      ctx.font = '24px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      underwears.forEach((u, index) => {
+        if (u.alive) {
+          const offsetX = 0;
+          const offsetY = 0;
+          const x = u.baseX + offsetX;
+          const y = u.baseY + offsetY;
+          ctx.fillStyle = u.color;
+          ctx.fillText(u.emoji, x + u.width / 2, y + u.height / 2);
+        }
+      });
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = 'yellow';
+      player.bullets.forEach(b => {
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+      });
+    }
+
+    function drawPoopBombs() {
+      ctx.font = '20px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      poopBombs.forEach(p => {
+        ctx.fillText(p.splat ? '💥' : '💩', p.x, p.y);
+      });
+    }
+
+    function update(deltaTime) {
+      if (gameOver) return;
+
+      let edgeReached = false;
+      underwears.forEach(u => {
+        if (!u.alive) return;
+        u.baseX += underwearDirection * underwearSpeed * deltaTime;
+        if (u.baseX < 10 || u.baseX + u.width > canvas.width - 10) {
+          edgeReached = true;
+        }
+      });
+      if (edgeReached) {
+        underwearDirection *= -1;
+        underwearSpeed += 0.05;
+        underwears.forEach(u => {
+          u.baseY += 10;
+          if (u.baseY + u.height >= player.y) {
+            gameOver = true;
+            document.getElementById('splatSound').play();
+          }
+        });
+      }
+
+      if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+      if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
+
+      player.bullets.forEach(b => b.y -= bulletSpeed * deltaTime);
+      player.bullets = player.bullets.filter(b => b.y > 0);
+
+      underwears.forEach((u, index) => {
+        if (u.alive && Math.random() < 0.0005) {
+          const offsetX = Math.sin((tick + index * 5) * 0.1) * 5;
+          const x = u.baseX + offsetX + u.width / 2;
+          const y = u.baseY + Math.cos((tick + index * 5) * 0.15) * 2 + u.height;
+          poopBombs.push({ x, y, width: 10, height: 10, splat: false });
+        }
+      });
+
+      poopBombs.forEach(p => {
+        p.y += 4 * deltaTime;
+        if (
+          p.x < player.x + player.width &&
+          p.x + p.width > player.x &&
+          p.y < player.y + player.height &&
+          p.y + p.height > player.y
+        ) {
+          p.splat = true;
+          document.getElementById('splatSound').play();
+          gameOver = true;
+        }
+      });
+      poopBombs = poopBombs.filter(p => p.y < canvas.height && !p.splat);
+
+      player.bullets.forEach(b => {
+        underwears.forEach(u => {
+          const offsetX = Math.sin((tick + underwears.indexOf(u) * 5) * 0.1) * 5;
+          const offsetY = Math.cos((tick + underwears.indexOf(u) * 5) * 0.15) * 2;
+          const x = u.baseX + offsetX;
+          const y = u.baseY + offsetY;
+
+          if (u.alive && b.x < x + u.width && b.x + b.width > x && b.y < y + u.height && b.y + b.height > y) {
+            u.alive = false;
+            document.getElementById('hitSound').play();
+            b.y = -10;
+            score++;
+          }
+        });
+
+        poopBombs.forEach(p => {
+          if (!p.splat && b.x < p.x + p.width && b.x + b.width > p.x && b.y < p.y + p.height && b.y + b.height > p.y) {
+            p.splat = true;
+            b.y = -10;
+            score++;
+          }
+        });
+      });
+    }
+
+    function draw() {
+      if (gameOver) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'red';
+        ctx.font = '32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💩 YOU GOT SPLATTED! 💩', canvas.width / 2, canvas.height / 2);
+        document.getElementById('restartBtn').style.display = 'inline-block';
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Score: ' + score, 10, 20);
+      drawPlayer();
+      drawUnderwears();
+      drawBullets();
+      drawPoopBombs();
+
+      const allDefeated = underwears.every(u => !u.alive);
+      if (allDefeated) {
+        ctx.fillStyle = 'lime';
+        ctx.font = '32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
+        document.getElementById('restartBtn').style.display = 'inline-block';
+      }
+    }
+
+    let lastFrameTime = performance.now();
+
+    function gameLoop() {
+      const now = performance.now();
+      const deltaTime = (now - lastFrameTime) / (1000 / 60); // normalize to 60fps
+      lastFrameTime = now;
+
+      update(deltaTime);
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if ((e.key === ' ' || e.code === 'Space') && Date.now() - lastShotTime > shotCooldown) {
+        lastShotTime = Date.now();
+        document.getElementById('shootSound').play();
+        player.bullets.push({
+          x: player.x + player.width / 2 - 2,
+          y: player.y,
+          width: 4,
+          height: 10
+        });
+      }
+    });
+
+    document.addEventListener('keyup', e => {
+      keys[e.key] = false;
+    });
+
+    createUnderwears();
+    gameLoop();
+
+    document.getElementById('restartBtn').addEventListener('click', () => {
+      underwearSpeed = 1;
+      gameOver = false;
+      underwears.length = 0;
+      player.x = canvas.width / 2 - 20;
+      player.bullets = [];
+      score = 0;
+      tick = 0;
+      poopBombs = [];
+      createUnderwears();
+      document.getElementById('restartBtn').style.display = 'none';
+    });
+  </script>
+</body>
+</html>
